@@ -1,0 +1,108 @@
+#!/bin/bash                                                                                                                                                                                     
+#Checking KDUMP status on RHEL6 nodes                                                                                                                                                           
+#Author: Tridibesh Chakraborty                                                                                                                                                                  
+#Emai ID: tridibesh.chakraborty@cerner.com                                                                                                                                                      
+#Version: 0.1
+#Using for Cerner Corporation doesn't require author's approval
+# Date: 23rd December 2015
+echo "Checking Kdump status on RHEL6 nodes"
+echo "Please provide the hostlist:"
+read HOSTLIST
+echo "NODE_NAME OS_VERSION  MEMORY(GB) SOFTWARE  ASRD_STATUS ASRD_AUTO_START MOUNT_POINT SIZE CRASH_VG    CRASH_LV    KDUMP_SERVICE" >/home/tridibesh/kdump/final.out
+for HOST in `cat $HOSTLIST`
+do
+
+OUTPUT=/home/tridibesh/kdump/$HOST.out
+echo "Checking kdump status in $HOST"
+ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -o ConnectTimeout=5 $HOST "cat /etc/redhat-release;rpm -qa |grep kexec-tools;echo "HP-ASRD status";service hp-asrd status; chkconfig --list|grep hp-asrd; df -hP /var/crash;vgs; lvs;echo "KDUMP service status";service kdump status; free -g" >$OUTPUT
+
+OS_VERSION=`grep Enterprise $OUTPUT|awk '{print $7}'`
+if [ $? -eq 0 ];then
+grep -i "kexec-tools" $OUTPUT 1>/dev/null
+if [ $? -eq 0 ]; then
+        INSTALL=YES
+
+else
+        INSTALL=NO
+
+fi
+MEM_SIZE=`grep Mem $OUTPUT | awk '{print $2}'`
+if [ "$INSTALL" = "YES" ];then
+        `grep -A 1 HP-ASRD $OUTPUT |grep Not >/tmp/asrd`
+                V1=`cat /tmp/asrd|wc -l`
+                if [ "$V1" = 1 ];then
+                ASRD_STATUS=STOPPED
+                else
+                ASRD_STATUS=RUNNING
+                fi
+        grep "hp-asrd" $OUTPUT 1>/dev/null
+        if [ $? -eq 0 ]; then
+                CHK_ENTRY=YES
+
+        else
+                CHK_ENTRY=NO
+
+        fi
+
+        grep -A 1 Filesystem $OUTPUT|grep crashdump 1>/dev/null
+        if [ $? -eq 0 ]; then
+                MOUNT=YES
+
+        else
+                MOUNT=NO
+
+        fi
+
+        if [ "$MOUNT" = "YES" ];then
+                grep crashdumpvg $OUTPUT 1>/dev/null
+                if [ $? -eq 0 ]; then
+                VG=YES
+
+                else
+                VG=NO
+
+                fi
+                grep crashdumplv $OUTPUT 1>/dev/null
+                if [ $? -eq 0 ]; then
+                        LV=YES
+
+                else
+                        LV=NO
+
+                fi
+                
+		if [ "$VG" = "NO" ] && [ "$LV" = "NO" ];then
+			MOUNT_SIZE="0GB"
+		else
+			MOUNT_SIZE=`grep -A 1 Filesystem $OUTPUT|grep crashdump | awk '{print $2}'`
+		fi
+        else
+                VG=NO
+                LV=NO
+                MOUNT_SIZE="0GB"
+
+        fi
+
+        SRV_STATUS=`grep Kdump $OUTPUT | awk '{print $3$4}'`
+else
+        ASRD_STATUS=NA
+        CHK_ENTRY=NA
+        MOUNT=NA
+        VG=NA
+        LV=NA
+        SRV_STATUS=NA
+
+fi
+echo ""$HOST" RHEL"$OS_VERSION" "$MEM_SIZE"       "$INSTALL"    "$ASRD_STATUS"    "$CHK_ENTRY"      "$MOUNT" "$MOUNT_SIZE"  "$VG"     "$LV"     "$SRV_STATUS"" >>/home/tridibesh/kdump/final.out
+#rm -rf $OUTPUT
+
+else
+ STATUS=NO_CONNECTION
+ echo "$HOST $STATUS">>/home/tridibesh/kdump/final.out
+fi
+done
+
+
+column -t /home/tridibesh/kdump/final.out
+
+#mailx -s "KDUMP status Check" tridibesh.chakraborty@cerner.com </home/tc033655/kdump/final.out
