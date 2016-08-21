@@ -2,8 +2,8 @@
 #Checking KDUMP status on RHEL6 nodes                                                                                                                                                           
 #Author: Tridibesh Chakraborty                                                                                                                                                                  
 #Emai ID: tridi.etce@gmail.com                                                                                                                                                 
-#Version: 0.2
-# Date: 13th May 2016
+#Version: 0.3
+# Date: 21st August 2016
 TMP_DIR=/tmp/kdump_status
 TMP_FILE=$TMP_DIR/temp.out
 if [ -d $TMP_DIR ]; then
@@ -17,7 +17,7 @@ if [  $1 = "--help" ] || [ $1 = "-h" ]; then
 	echo "USAGE: execute kdump_status alone and then provide the path of hostlist"
 else
 	echo "Checking Kdump status on RHEL6 nodes"
-	echo "Please provide the hostlist:"
+	printf "Please provide the hostlist: "
 	read HOSTLIST
 	echo "NODE_NAME OS_VERSION  MEMORY(GB) SOFTWARE  ASRD_STATUS ASRD_AUTO_START MOUNT_POINT SIZE CRASH_VG    CRASH_LV    KDUMP_SERVICE" >$TMP_FILE
 for HOST in `cat $HOSTLIST`
@@ -98,10 +98,10 @@ echo ""$HOST" RHEL"$OS_VERSION" "$MEM_SIZE"       "$INSTALL"    "$ASRD_STATUS"  
 
 else
  STATUS=NO_CONNECTION
- echo "$HOST $STATUS">>/home/tridibesh/kdump/final.out
+ echo "$HOST $STATUS">>$TMP_FILE
 fi
 done
 
-column -t /home/tridibesh/kdump/final.out
+column -t $TMP_FILE
 fi
-#mailx -s "KDUMP status Check" tridibesh.chakraborty@cerner.com </home/tc033655/kdump/final.out
+
